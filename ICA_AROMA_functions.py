@@ -69,6 +69,9 @@ def runICA(fslDir, inFile, outDir, melDirIn, mask, dim, TR):
                                 '--mix=' + melICmix,
                                 '--outdir=' + melDir,
                                 '--Ostats --mmthresh=0.5']))
+            # Wait until it's done
+            while not os.path.isfile(os.path.join(melDirIn, 'melodic_mix')):
+                time.sleep(30)
 
     else:
         # If a melodic directory was specified, display that it did not contain all files needed for ICA-AROMA (or that the directory does not exist at all)
@@ -86,6 +89,11 @@ def runICA(fslDir, inFile, outDir, melDirIn, mask, dim, TR):
                             '--dim=' + str(dim),
                             '--Ostats --nobet --mmthresh=0.5 --report',
                             '--tr=' + str(TR)]))
+        # WAIT until it's done (why it doesn't wait????)
+        print('Waiting until MELODIC is done...')
+        import time
+        while not os.path.isfile(os.path.join(melDirIn, 'melodic_mix')):
+            time.sleep(30)
 
     # Get number of components
     cmd = ' '.join([os.path.join(fslDir, 'fslinfo'),
@@ -163,14 +171,15 @@ def register2MNI(fslDir, inFile, outFile, affmat, warp):
         pixdim3 = float(subprocess.getoutput('%sfslinfo %s | grep pixdim3 | awk \'{print $2}\'' % (fslDir, inFile)))
 
         # If voxel size is not 2mm isotropic, resample the data, otherwise copy the file
-        if (pixdim1 != 2) or (pixdim2 != 2) or (pixdim3 != 2):
-            os.system(' '.join([os.path.join(fslDir, 'flirt'),
-                                ' -ref ' + ref,
-                                ' -in ' + inFile,
-                                ' -out ' + outFile,
-                                ' -applyisoxfm 2 -interp trilinear']))
-        else:
-            os.system('cp ' + inFile + ' ' + outFile)
+        #if (pixdim1 != 2) or (pixdim2 != 2) or (pixdim3 != 2):
+        # NOT A GOOD IDEA because there can be any matrix sizes for 2x2x2 mm^3
+        os.system(' '.join([os.path.join(fslDir, 'flirt'),
+                            ' -ref ' + ref,
+                            ' -in ' + inFile,
+                            ' -out ' + outFile,
+                            ' -applyisoxfm 2 -interp trilinear']))
+        #else:
+        #    os.system('cp ' + inFile + ' ' + outFile)
 
     # If only a warp-file has been specified, assume that the data has already been registered to the structural scan. In that case apply the warping without a affmat
     elif (len(affmat) == 0) and (len(warp) != 0):
@@ -241,8 +250,12 @@ def feature_time_series(melmix, mc):
                          np.diff(rp6, axis=0)
                          ))
 
+    #RP6_der = np.array(RP6[list(range(1, RP6.shape[0])), :] - RP6[list(range(0, RP6.shape[0] - 1)), :])
+    #RP6_der = np.concatenate((np.zeros((1, 6)), RP6_der), axis=0)
+
     # Create an RP-model including the RPs and its derivatives
     rp12 = np.hstack((rp6, rp6_der))
+    #RP12 = np.concatenate((RP6, RP6_der), axis=1)
 
     # Add the squared RP-terms to the model
     # add the fw and bw shifted versions
